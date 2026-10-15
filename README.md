@@ -1,4 +1,32 @@
-# Full-Stack Go: Domain-Driven Applications with sqlc and templ
+# Tazama: wildlife, seen up close
+
+**Live demo: https://gophercondemo.gritframework.dev/**
+
+*Tazama* means "look" in Swahili. It's a site of real wildlife sightings from
+[GBIF](https://www.gbif.org): 500 sightings of 78 species in 56 countries, each photographed by
+someone who was there. Built in Go with sqlc, SQLite and templ during the GopherCon Africa 2026
+workshop in Nairobi.
+
+What to try:
+
+- **[Compare two countries](https://gophercondemo.gritframework.dev/#compare)**: pick any two,
+  play four rounds (species, sightings, animals found only there, photos) and see the winner.
+  Tap an animal they share to compare it head to head. Your match-ups are saved in your browser.
+- **[The zoo](https://gophercondemo.gritframework.dev/zoo)**: a 3D park built with three.js.
+  Zebras gallop, flamingos circle their lagoon, macaws loop in the aviary, and screens play real
+  footage of lions, elephants, giraffes and penguins. Get close, look from above, ride along, or
+  start the show.
+- **Sightings**: a photo wall with search by animal, country and date. Each sighting has its own
+  page with the weather that hour, a map, and videos of the species from Wikimedia Commons.
+- **[The map](https://gophercondemo.gritframework.dev/map)** and the spinning globe show where
+  every animal was seen; **[Numbers](https://gophercondemo.gritframework.dev/stats)** charts it all.
+
+Made with Go, sqlc, templ, SQLite, three.js, GSAP and Leaflet. Videos from Wikimedia Commons,
+weather from Open-Meteo, map tiles from OpenStreetMap.
+
+---
+
+## The workshop: Full-Stack Go, Domain-Driven Applications with sqlc and templ
 
 **About the author:**
 Ainsley Clark, Go Developer Advocate @ JetBrains
