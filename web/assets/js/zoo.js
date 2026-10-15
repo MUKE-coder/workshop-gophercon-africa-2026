@@ -8,6 +8,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { createNature } from "./zoo-nature.js";
 
 const root = document.querySelector("[data-zoo]");
 const canvas = root?.querySelector("[data-zoo-canvas]");
@@ -140,10 +141,6 @@ function start(exhibits) {
 	const FENCE = 13;
 	const n = exhibits.length;
 
-	const ground = shadowed(new THREE.Mesh(new THREE.CircleGeometry(260, 64), M.grass), false);
-	ground.rotation.x = -Math.PI / 2;
-	scene.add(ground);
-
 	const path = shadowed(new THREE.Mesh(new THREE.RingGeometry(24, 30, 96), M.path), false);
 	path.rotation.x = -Math.PI / 2;
 	path.position.y = 0.02;
@@ -178,35 +175,7 @@ function start(exhibits) {
 		return new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
 	};
 
-	// Trees: low-poly trunks and canopies, scattered outside the enclosures.
-	const treeSpots = [];
-	for (let k = 0; k < 220; k++) {
-		const r = 34 + rand() * 150;
-		const a = rand() * Math.PI * 2;
-		const p = new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
-		const nearEnclosure = exhibits.some((_, i) => p.distanceTo(dirOf(i).multiplyScalar(RING)) < FENCE + 4);
-		const onSpoke = exhibits.some((_, i) => {
-			const d = dirOf(i);
-			const along = p.dot(d);
-			return along > 28 && along < RING && p.clone().sub(d.clone().multiplyScalar(along)).length() < 4;
-		});
-		if (!nearEnclosure && !onSpoke) treeSpots.push(p);
-	}
-	const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 3, 6);
-	const crownGeo = new THREE.IcosahedronGeometry(2.4, 0);
-	const trunks = new THREE.InstancedMesh(trunkGeo, M.wood, treeSpots.length);
-	const crowns = new THREE.InstancedMesh(crownGeo, M.leaf, treeSpots.length);
 	const m4 = new THREE.Matrix4();
-	treeSpots.forEach((p, k) => {
-		const s = 0.8 + rand() * 0.9;
-		m4.compose(p.clone().setY(1.5 * s), new THREE.Quaternion(), new THREE.Vector3(s, s, s));
-		trunks.setMatrixAt(k, m4);
-		m4.compose(p.clone().setY(4.2 * s), new THREE.Quaternion().setFromEuler(new THREE.Euler(rand(), rand() * 3, 0)), new THREE.Vector3(s, s * 1.15, s));
-		crowns.setMatrixAt(k, m4);
-	});
-	shadowed(trunks);
-	shadowed(crowns);
-	scene.add(trunks, crowns);
 
 	// Lamp posts around the path, lit at night.
 	for (let k = 0; k < 14; k++) {
@@ -281,10 +250,6 @@ function start(exhibits) {
 
 		// Scenery by habitat.
 		if (ex.ground === "savanna") {
-			for (let k = 0; k < 2; k++) {
-				const at = side.clone().multiplyScalar(k ? 7 : -7).add(dir.clone().multiplyScalar(4));
-				group.add(acacia(at));
-			}
 			if (ex.key === "lion") {
 				for (let k = 0; k < 4; k++) {
 					const rock = shadowed(new THREE.Mesh(new THREE.DodecahedronGeometry(1.2 + rand() * 1.6, 0), M.rock));
@@ -301,13 +266,6 @@ function start(exhibits) {
 				new THREE.LineBasicMaterial({ color: 0x2b3a30, transparent: true, opacity: 0.55 }),
 			);
 			group.add(dome);
-			for (let k = 0; k < 6; k++) {
-				const a = rand() * Math.PI * 2;
-				const r = 3 + rand() * 6;
-				const t = shadowed(new THREE.Mesh(new THREE.ConeGeometry(1.6, 5 + rand() * 3, 7), M.leafDark));
-				t.position.set(Math.cos(a) * r, 2.8, Math.sin(a) * r);
-				group.add(t);
-			}
 		}
 
 		// The sign at the gate, facing the path.
@@ -345,9 +303,11 @@ function start(exhibits) {
 			const leg = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.2, 5), M.wood));
 			leg.position.set(0, 0.6, -0.1);
 			frame.add(photo, backing, leg);
-			const offset = (k - (boards.length - 1) / 2) * 4.2;
-			frame.position.copy(dir.clone().multiplyScalar(-(FENCE - 2.6)).add(side.clone().multiplyScalar(offset)));
-			frame.rotation.y = facePath + (k - (boards.length - 1) / 2) * -0.25;
+			// A little gallery outside the fence, either side of the gate sign.
+			const slot = [-5.4, 5.4, -9.4][k];
+			frame.scale.setScalar(0.8);
+			frame.position.copy(dir.clone().multiplyScalar(-(FENCE + 1.4)).add(side.clone().multiplyScalar(slot)));
+			frame.rotation.y = facePath + (slot < 0 ? 0.3 : -0.3);
 			group.add(frame);
 		});
 
@@ -373,6 +333,26 @@ function start(exhibits) {
 		stations.set(ex.key, { ex, i, dir, center, side, screen, animals: [], video: null, showUntil: 0 });
 	}
 
+	// Landscape: hills, trees, palms, bushes, reeds, flowers and grass,
+	// kept off the paths, the plaza and out of the enclosures.
+	const isFree = (p, margin) => {
+		const r = Math.hypot(p.x, p.z);
+		if (r < 13 + margin) return false;
+		if (r > 22.5 - margin && r < 31 + margin) return false;
+		for (const st of stations.values()) {
+			if (p.distanceTo(st.center) < FENCE + 3 + margin) return false;
+			const along = p.dot(st.dir);
+			if (along > 28 && along < RING && p.clone().sub(st.dir.clone().multiplyScalar(along)).length() < 2.5 + margin) return false;
+		}
+		return true;
+	};
+	const nature = createNature({
+		rand,
+		isFree,
+		enclosures: [...stations.values()].map((st) => ({ center: st.center, dir: st.dir, ground: st.ex.ground, fence: FENCE })),
+	});
+	scene.add(nature.group);
+
 	// Views ------------------------------------------------------------------------
 
 	const views = {
@@ -386,7 +366,7 @@ function start(exhibits) {
 			case "close":
 				return st.screen
 					? { pos: lookAt.clone().sub(d.clone().multiplyScalar(13)).setY(lookAt.y - 0.5), target: lookAt }
-					: { pos: c.clone().sub(d.clone().multiplyScalar(14)).add(st.side.clone().multiplyScalar(4)).setY(st.ex.kind === "herd" ? 4 : 6), target: c.clone().setY(st.ex.kind === "herd" ? 2.5 : 4) };
+					: { pos: c.clone().sub(d.clone().multiplyScalar(6)).add(st.side.clone().multiplyScalar(6)).setY(st.ex.kind === "herd" ? 6.5 : 7.5), target: c.clone().setY(st.ex.kind === "herd" ? 2 : 4) };
 			case "top":
 				return { pos: c.clone().sub(d.clone().multiplyScalar(4)).setY(40), target: c.clone() };
 			default:
@@ -586,9 +566,11 @@ function start(exhibits) {
 
 	// One animal: a clone of the model with its own animation, moving on a
 	// circle around its enclosure.
-	const spawn = (gltf, { size, station, radius, height, speed, flap, material }) => {
+	const spawn = (gltf, { size, station, radius, height, speed, flap, material, angle, dir, center }) => {
 		const model = gltf.scene.children[0];
-		const box = new THREE.Box3().setFromObject(model);
+		// Measure the resting body: the bounding box also covers how far the
+		// legs and wings reach while animating, which would shrink them.
+		const box = new THREE.Box3().setFromBufferAttribute(model.geometry.attributes.position);
 		const dims = box.getSize(new THREE.Vector3());
 		const mesh = model.clone();
 		if (material) mesh.material = material;
@@ -602,13 +584,13 @@ function start(exhibits) {
 		const a = {
 			mesh,
 			mixer,
-			center: station ? station.center.clone() : new THREE.Vector3(),
+			center: center ? center.clone() : station ? station.center.clone() : new THREE.Vector3(),
 			radius,
 			height,
 			speed,
 			baseSpeed: speed,
-			angle: rand() * Math.PI * 2,
-			dir: rand() > 0.5 ? 1 : -1,
+			angle: angle ?? rand() * Math.PI * 2,
+			dir: dir ?? (rand() > 0.5 ? 1 : -1),
 			bob: rand() * 10,
 			station,
 			lift: 0,
@@ -621,8 +603,7 @@ function start(exhibits) {
 
 	// Zebras are the horse model with stripes painted on in the shader.
 	const zebraMaterial = (geometry) => {
-		geometry.computeBoundingBox();
-		const bb = geometry.boundingBox;
+		const bb = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
 		const size = bb.getSize(new THREE.Vector3());
 		const axis = size.x >= size.z ? 0 : 2;
 		const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, flatShading: true });
@@ -653,24 +634,39 @@ function start(exhibits) {
 		if (horse && zebra) {
 			const stripes = zebraMaterial(horse.scene.children[0].geometry);
 			for (let k = 0; k < 3; k++) {
-				spawn(horse, { size: 7, station: zebra, radius: 4 + k * 2.6, height: 0, speed: 4.5 + rand() * 1.2, flap: 0.9, material: stripes });
+				spawn(horse, { size: 8.5, station: zebra, radius: 3.8 + k * 2.6, height: 0, speed: 5 + rand() * 1.2, flap: 0.8, material: stripes });
 			}
 		}
 		const lagoon = stations.get("flamingo");
 		if (flamingo && lagoon) {
 			for (let k = 0; k < 6; k++) {
-				spawn(flamingo, { size: 5, station: lagoon, radius: 3 + rand() * 5, height: 2.5 + rand() * 2.5, speed: 3.5 + rand(), flap: 1.1 });
+				spawn(flamingo, { size: 6.5, station: lagoon, radius: 3 + rand() * 5, height: 3 + rand() * 3, speed: 4 + rand(), flap: 1.1 });
 			}
 		}
 		const aviary = stations.get("macaw");
 		if (parrot && aviary) {
 			for (let k = 0; k < 5; k++) {
-				spawn(parrot, { size: 3.6, station: aviary, radius: 3 + rand() * 5, height: 3.5 + rand() * 4, speed: 5 + rand() * 1.5, flap: 0.55 });
+				spawn(parrot, { size: 5, station: aviary, radius: 3 + rand() * 5, height: 4 + rand() * 4, speed: 5.5 + rand() * 1.5, flap: 0.55 });
 			}
 		}
+		// Birds flying around the whole park, like the ones on the home page.
 		if (stork) {
 			for (let k = 0; k < 4; k++) {
-				spawn(stork, { size: 8, station: null, radius: 60 + rand() * 40, height: 32 + rand() * 10, speed: 9, flap: 1.2 });
+				spawn(stork, { size: 12, station: null, radius: 70 + rand() * 40, height: 34 + rand() * 12, speed: 10, flap: 1.2 });
+			}
+		}
+		if (flamingo) {
+			// A V of flamingos: the same speed and heading, staggered back and out.
+			const lead = rand() * Math.PI * 2;
+			for (let k = 0; k < 9; k++) {
+				const rank = Math.ceil(k / 2);
+				const wing = k % 2 ? 1 : -1;
+				spawn(flamingo, { size: 7, station: null, radius: 62 + wing * rank * 3, height: 20 + rank * 0.6, speed: 11, flap: 1.05, angle: lead - rank * 0.07, dir: 1 });
+			}
+		}
+		if (parrot) {
+			for (let k = 0; k < 4; k++) {
+				spawn(parrot, { size: 4.5, station: null, radius: 16 + rand() * 5, height: 9 + rand() * 4, speed: 9 + rand() * 2, flap: 0.5, dir: -1 });
 			}
 		}
 	});
@@ -796,23 +792,12 @@ function start(exhibits) {
 
 		jet.scale.y = 1 + Math.sin(t * 6) * 0.06;
 		M.water.opacity = 0.88 + Math.sin(t * 1.3) * 0.04;
+		nature.update(t);
 		renderer.render(scene, camera);
 	};
 	tick();
 
 	// Helpers ---------------------------------------------------------------------------
-
-	function acacia(at) {
-		const g = new THREE.Group();
-		const trunk = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 4, 6), M.wood));
-		trunk.position.y = 2;
-		const top = shadowed(new THREE.Mesh(new THREE.SphereGeometry(3, 8, 5), M.acacia));
-		top.scale.set(1, 0.32, 1);
-		top.position.y = 4.3;
-		g.add(trunk, top);
-		g.position.copy(at);
-		return g;
-	}
 
 	function signTexture(ex) {
 		const c = document.createElement("canvas");

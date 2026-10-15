@@ -15,7 +15,10 @@ WORKDIR /app
 COPY --from=build /out/workshop /app/workshop
 COPY --from=build /src/workshop.db /app/workshop.db
 
-ENV PORT=8080 \
+# Production serves the CSS, JS and models embedded in the binary; there's no
+# web/ folder in this image to read them from.
+ENV APP_ENV=production \
+	PORT=8080 \
 	DB_URI=file:/app/workshop.db
 
 EXPOSE 8080

@@ -63,6 +63,12 @@ Dark mode swaps the paper for `#0D1411`, the band for `#12271E`, and lightens fo
   boards. Frosted glass cards (`--glass`) hold the welcome, one panel per enclosure (fact, numbers,
   photos, camera angles, Showtime) and the strip of enclosures along the bottom. Day or night
   follows the site theme; lamps light up at night. A home page teaser links to it.
+  The landscape lives in `web/assets/js/zoo-nature.js`: hills beyond the park with patchy grass
+  colour, leafy trees built from several lumpy clusters, flat-topped acacias, baobabs between
+  enclosures, curved palms (fountain, lagoon, aviary, beach), bushes, reeds, flowers and grass
+  tufts, all swaying in a shared wind. Birds fly over the whole park: a V of flamingos, macaws
+  over the plaza and storks up high. Animals are sized by their resting body (zebras about 8.5
+  units long in a 26-unit paddock).
 - **Globe**: light, forest coastlines, coloured dots per species.
 
 ## Motion
