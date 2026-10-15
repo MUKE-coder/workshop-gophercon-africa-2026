@@ -1,0 +1,254 @@
+package pages
+
+import (
+	"strconv"
+	"strings"
+	"workshop/web/views/components"
+)
+
+templ compareSection(d HomeData) {
+	{{ c := d.Compare }}
+	<section id="compare" class="band" aria-labelledby="compare-title">
+		<div class="band__inner">
+			<div class="section__head section__head--band">
+				<h2 id="compare-title">Pick two countries. <em class="script">Compare</em> the wild.</h2>
+				<p class="section__note">Four rounds decide the winner: variety, sightings, animals found nowhere else, and photos.</p>
+			</div>
+			<form class="versus-form" method="get" action="/#compare" aria-label="Choose two countries to compare" data-versus-form>
+				@keepFilter(d.Filter)
+				@countryPicker("a", "First country", d.Countries, c.A.Code)
+				<button class="versus-form__swap" type="button" data-swap aria-label="Swap the two countries" title="Swap">
+					<span>vs</span>
+					<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 7h12m0 0-3-3m3 3-3 3M16 13H4m0 0 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+				</button>
+				@countryPicker("b", "Second country", d.Countries, c.B.Code)
+				<button class="pill pill--lime" type="submit">
+					Compare
+					@components.Arrow()
+				</button>
+			</form>
+			<div class="saved" data-saved hidden>
+				<div class="saved__head">
+					<h3>Your comparisons</h3>
+					<button class="saved__clear" type="button" data-saved-clear>Clear all</button>
+				</div>
+				<ul class="saved__list" data-saved-list></ul>
+			</div>
+			if c.A.Code != "" && c.B.Code != "" {
+				<div
+					class="versus"
+					data-versus
+					data-a={ c.A.Code }
+					data-b={ c.B.Code }
+					data-a-name={ c.A.Name }
+					data-b-name={ c.B.Name }
+					data-winner={ c.WinnerName() }
+				>
+					@scoreboard(c)
+					<div class="versus__columns">
+						@sideColumn(c.A, "left", c.Winner == "a")
+						<div class="versus__middle">
+							<p class="versus__shared-count">
+								<strong>{ strconv.Itoa(len(c.Shared)) }</strong>
+								if len(c.Shared) == 1 {
+									animal in common
+								} else {
+									animals in common
+								}
+							</p>
+							if len(c.Shared) > 0 {
+								<p class="versus__hint">Tap an animal to compare it.</p>
+								<ul class="chips">
+									for i, s := range c.Shared {
+										<li>
+											<button
+												class="chip"
+												type="button"
+												data-shared-chip={ strconv.Itoa(i) }
+												data-name={ s.Name }
+												aria-expanded="false"
+												aria-controls={ "shared-" + strconv.Itoa(i) }
+											>{ s.Name }</button>
+										</li>
+									}
+								</ul>
+								for i, s := range c.Shared {
+									@sharedCard(c, s, i)
+								}
+							} else {
+								<p class="versus__none">No animal turns up in both. Two different worlds.</p>
+							}
+						</div>
+						@sideColumn(c.B, "right", c.Winner == "b")
+					</div>
+				</div>
+			}
+		</div>
+	</section>
+}
+
+templ countryPicker(name, label string, options []Option, selected string) {
+	<label class="field field--band" data-picker>
+		<span>{ label }</span>
+		<select name={ name } data-combobox>
+			for _, o := range options {
+				<option value={ o.Value } data-count={ strconv.Itoa(o.Count) } selected?={ o.Value == selected }>{ o.Label }</option>
+			}
+		</select>
+	</label>
+}
+
+templ scoreboard(c Compare) {
+	<div class="scoreboard">
+		<div class="verdict" data-verdict>
+			<span class="verdict__trophy" aria-hidden="true">
+				<svg viewBox="0 0 24 24" width="30" height="30"><path d="M7 4h10v3a5 5 0 0 1-10 0V4Zm0 1H4v1a3 3 0 0 0 3 3m10-4h3v1a3 3 0 0 1-3 3m-5 3v4m-4 4h8m-6 0 1-4h2l1 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+			</span>
+			if c.Winner == "" {
+				<p class="verdict__title">It's a <em class="script">draw.</em></p>
+				<p class="verdict__note">{ drawLine(c) }</p>
+			} else {
+				<p class="verdict__title">{ c.WinnerName() } <em class="script">wins!</em></p>
+				<p class="verdict__note">{ winsLine(c) }</p>
+			}
+		</div>
+		<table class="rounds">
+			<caption class="visually-hidden">Round by round</caption>
+			<thead>
+				<tr>
+					<th scope="col">
+						@flag(c.A.Code)
+						{ c.A.Name }
+					</th>
+					<th scope="col">Round</th>
+					<th scope="col">
+						@flag(c.B.Code)
+						{ c.B.Name }
+					</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, r := range c.Rounds {
+					<tr>
+						<td class={ templ.KV("is-won", r.Winner == "a") }>{ strconv.Itoa(r.A) }</td>
+						<th scope="row">{ r.Name }</th>
+						<td class={ templ.KV("is-won", r.Winner == "b") }>{ strconv.Itoa(r.B) }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+templ sideColumn(s Side, align string, winner bool) {
+	{{ top := 0 }}
+	if len(s.Animals) > 0 {
+		{{ top = s.Animals[0].Count }}
+	}
+	<div class={ "side", "side--" + align, templ.KV("side--winner", winner) }>
+		if winner {
+			<span class="side__crown">Winner</span>
+		}
+		<header class="side__head">
+			<h3>
+				@flag(s.Code)
+				{ s.Name }
+			</h3>
+			<p>{ plural(s.Sightings, "sighting", "sightings") } of { plural(s.Species, "species", "species") }</p>
+		</header>
+		<ol class="side__list">
+			for _, a := range s.Animals {
+				<li>
+					<a class={ "side__row", templ.KV("is-shared", a.Shared) } href={ templ.SafeURL(a.Link) }>
+						if a.Img != "" {
+							<img src={ a.Img } alt="" loading="lazy" decoding="async"/>
+						} else {
+							<span class="side__noimg" aria-hidden="true">{ string([]rune(a.Name)[0]) }</span>
+						}
+						<span class="side__name" data-name={ a.Name }>
+							{ a.Name }
+							if a.Shared {
+								<span class="side__both" title="Seen in both countries">in both</span>
+							}
+						</span>
+						<span class="side__bar" aria-hidden="true"><span style={ barWidth(a.Count, top) }></span></span>
+						<span class="side__count">{ strconv.Itoa(a.Count) }</span>
+					</a>
+				</li>
+			}
+		</ol>
+	</div>
+}
+
+templ sharedCard(c Compare, s SharedAnimal, i int) {
+	<div class="shared-card" id={ "shared-" + strconv.Itoa(i) } data-shared-card={ strconv.Itoa(i) } hidden>
+		if s.Photo() != "" {
+			<img class="shared-card__photo" src={ s.Photo() } alt={ s.Name } loading="lazy" decoding="async"/>
+		}
+		<div class="shared-card__body">
+			<p class="shared-card__name">{ s.Name }</p>
+			<p class="shared-card__verdict">
+				switch {
+					case s.A.Count > s.B.Count:
+						More sightings in { c.A.Name }
+					case s.B.Count > s.A.Count:
+						More sightings in { c.B.Name }
+					default:
+						Seen just as often in both
+				}
+			</p>
+			<div class="tug" role="img" aria-label={ c.A.Name + " " + strconv.Itoa(s.A.Count) + ", " + c.B.Name + " " + strconv.Itoa(s.B.Count) }>
+				<span class="tug__a" style={ tugWidth(s.A.Count) }>{ strconv.Itoa(s.A.Count) }</span>
+				<span class="tug__b" style={ tugWidth(s.B.Count) }>{ strconv.Itoa(s.B.Count) }</span>
+			</div>
+			<div class="tug__labels">
+				<span>
+					@flag(c.A.Code)
+					{ c.A.Name }
+				</span>
+				<span>
+					{ c.B.Name }
+					@flag(c.B.Code)
+				</span>
+			</div>
+			<div class="shared-card__links">
+				<a href={ templ.SafeURL(s.A.Link) }>See it in { c.A.Name }</a>
+				<a href={ templ.SafeURL(s.B.Link) }>See it in { c.B.Name }</a>
+			</div>
+		</div>
+	</div>
+}
+
+templ flag(code string) {
+	if len(code) == 2 {
+		<img class="flag" src={ "https://flagcdn.com/w40/" + strings.ToLower(code) + ".png" } alt="" width="24" height="18" loading="lazy" onerror="this.remove()"/>
+	}
+}
+
+func drawLine(c Compare) string {
+	if c.WinsA == 0 {
+		return "Every round finished level."
+	}
+	return plural(c.WinsA, "round", "rounds") + " each, with the same number of species and sightings."
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return strconv.Itoa(n) + " " + many
+}
+
+func winsLine(c Compare) string {
+	hi, lo := c.WinsA, c.WinsB
+	if c.Winner == "b" {
+		hi, lo = c.WinsB, c.WinsA
+	}
+	if hi == lo {
+		return "Level on rounds, decided on the number of species seen."
+	}
+	if hi == 1 {
+		return "1 round to " + strconv.Itoa(lo) + "."
+	}
+	return strconv.Itoa(hi) + " rounds to " + strconv.Itoa(lo) + "."
+}

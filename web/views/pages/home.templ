@@ -1,27 +1,251 @@
 package pages
 
 import (
-	"workshop/internal/domain/sighting"
+	"strconv"
 	"workshop/web/views/components"
 	"workshop/web/views/layout"
 )
 
-templ Home(sightings []sighting.Sighting) {
+templ Home(d HomeData) {
 	@layout.Base(layout.BaseProps{
-		Title: "Sightings",
+		Title:   "Tazama",
+		Active:  "home",
+		Scripts: homeScripts(),
 	}) {
-		<h1>Sightings</h1>
-		if len(sightings) == 0 {
-			<p>No sightings have been ingested yet.</p>
-		} else {
-			<p>Total: { len(sightings) }</p>
-			<ul class="sightings">
-				for _, s := range sightings {
-					<li>
-						@components.SightingCard(s)
-					</li>
+		<section class="hero" aria-labelledby="hero-title">
+			<div class="hero__copy">
+				<p class="badge">
+					@components.Leaf()
+					Sightings from { strconv.Itoa(d.Summary.Countries) } countries
+				</p>
+				<h1 id="hero-title" class="hero__title">
+					<span class="line"><span class="line__inner">Wildlife, seen</span></span>
+					<span class="line"><span class="line__inner">up <em class="script">close.</em></span></span>
+				</h1>
+				<p class="hero__lede">
+					Every photo here was taken by someone who was there: on safari, on a boat, in a back garden.
+					Browse what they saw, or put two countries head to head.
+				</p>
+				<div class="hero__actions">
+					<a class="pill pill--lime" href="#sightings">
+						Explore sightings
+						@components.Arrow()
+					</a>
+					<a class="hero__play" href="#compare">
+						<span class="hero__play-icon" aria-hidden="true">
+							<svg viewBox="0 0 16 16" width="14" height="14"><path d="M5 3.5v9l7-4.5z" fill="currentColor"></path></svg>
+						</span>
+						Compare two countries
+					</a>
+				</div>
+				<dl class="stats">
+					<div class="stat">
+						<dd>{ strconv.Itoa(d.Summary.Sightings) }</dd>
+						<dt>Sightings</dt>
+					</div>
+					<div class="stat">
+						<dd>{ strconv.Itoa(d.Summary.Species) }</dd>
+						<dt>Species</dt>
+					</div>
+					<div class="stat">
+						<dd>{ strconv.Itoa(d.Summary.Countries) }</dd>
+						<dt>Countries</dt>
+					</div>
+					<div class="stat">
+						<dd>{ strconv.Itoa(d.Summary.Media) }</dd>
+						<dt>Photos</dt>
+					</div>
+				</dl>
+			</div>
+			if len(d.Featured) > 0 {
+				<div class="hero__scene" data-slideshow>
+					for i, s := range d.Featured {
+						if img, ok := components.LeadImage(s); ok {
+							<figure class={ "hero__slide", templ.KV("is-active", i == 0) } data-slide>
+								<img
+									src={ components.Sized(img.URL, "large") }
+									alt={ components.AltText(img, components.DisplayName(s.Species)) }
+									if i == 0 {
+										fetchpriority="high"
+									} else {
+										loading="lazy"
+									}
+									decoding="async"
+								/>
+							</figure>
+						}
+					}
+					<div class="hero__mist" aria-hidden="true"></div>
+				</div>
+			}
+			if len(d.Recent) > 0 {
+				<ul class="floaters" aria-label="Newest sightings">
+					for _, s := range d.Recent {
+						<li>
+							@floater(s.ID.String(), components.DisplayName(s.Species), components.ShortPlace(s.Location), leadThumb(s))
+						</li>
+					}
+				</ul>
+			}
+			<canvas class="hero__birds" data-birds aria-hidden="true"></canvas>
+		</section>
+		<section id="sightings" class="section" aria-labelledby="wall-title">
+			<div class="section__head">
+				<div>
+					<h2 id="wall-title">
+						if d.Filter.Active() {
+							Your <em class="script">search</em>
+						} else {
+							Latest <em class="script">sightings</em>
+						}
+					</h2>
+					<p class="section__note">
+						if len(d.Sightings) == 0 {
+							Nothing matches yet.
+						} else if d.Matched > len(d.Sightings) {
+							Showing { strconv.Itoa(len(d.Sightings)) } of { strconv.Itoa(d.Matched) }, newest first.
+						} else {
+							{ strconv.Itoa(d.Matched) } sightings, newest first.
+						}
+					</p>
+				</div>
+			</div>
+			@filterForm(d)
+			if len(d.Sightings) == 0 {
+				<div class="empty">
+					if d.Filter.Active() {
+						<p>No sightings match that search. Try another animal or a wider date range.</p>
+						<a class="pill pill--forest" href="/#sightings">Clear the search</a>
+					} else {
+						<p>No sightings have been recorded yet. Run <code>go run . db seed</code> to add some.</p>
+					}
+				</div>
+			} else {
+				<ul class="grid">
+					for _, s := range d.Sightings {
+						<li>
+							@components.SightingCard(s)
+						</li>
+					}
+				</ul>
+				if d.MoreURL != "" {
+					<div class="grid__more">
+						<a class="pill pill--light" href={ templ.SafeURL(d.MoreURL) }>Show more sightings</a>
+					</div>
 				}
-			</ul>
-		}
+			}
+		</section>
+		@compareSection(d)
+		<section class="section" aria-labelledby="zoo-teaser-title">
+			<a class="zoo-teaser" href="/zoo">
+				if len(d.Featured) > 1 {
+					if img, ok := components.LeadImage(d.Featured[1]); ok {
+						<img src={ components.Sized(img.URL, "large") } alt="" loading="lazy" decoding="async"/>
+					}
+				}
+				<span class="zoo-teaser__body">
+					<span class="badge">New</span>
+					<span id="zoo-teaser-title" class="zoo-teaser__title">Step inside the <em class="script">zoo</em></span>
+					<span class="zoo-teaser__text">
+						Walk a 3D park of the animals people have seen: zebras galloping, flamingos over their lagoon,
+						macaws in the aviary, and real footage of lions and elephants. Get close, look from above, or ride along.
+					</span>
+					<span class="pill pill--lime">
+						Enter the zoo
+						@components.Arrow()
+					</span>
+				</span>
+			</a>
+		</section>
+		<section id="globe" class="section globe-section" aria-labelledby="globe-title">
+			<div class="globe-section__copy">
+				<h2 id="globe-title">Every dot is an animal someone <em class="script">saw.</em></h2>
+				<p>
+					Drag the globe to turn it. Hover a dot to see what was there, and click it to open the sighting.
+				</p>
+				<a class="pill pill--forest" href="/map">
+					Open the full map
+					@components.Arrow()
+				</a>
+			</div>
+			<div class="globe" data-globe>
+				<canvas aria-label="A globe with a dot for each sighting. Drag to turn it." role="img"></canvas>
+				<p class="globe__label" data-globe-label hidden></p>
+			</div>
+		</section>
+		@templ.JSONScript("globe-points", d.Points)
 	}
+}
+
+templ floater(id, name, place, thumb string) {
+	<a class="floater" href={ templ.SafeURL("/sightings/" + id) }>
+		if thumb != "" {
+			<img src={ thumb } alt="" loading="lazy" decoding="async"/>
+		}
+		<span>
+			<strong>{ name }</strong>
+			<small>{ place }</small>
+		</span>
+	</a>
+}
+
+templ keepFilter(f Filter) {
+	if f.Animal != "" {
+		<input type="hidden" name="animal" value={ f.Animal }/>
+	}
+	if f.Country != "" {
+		<input type="hidden" name="country" value={ f.Country }/>
+	}
+	if f.From != "" {
+		<input type="hidden" name="from" value={ f.From }/>
+	}
+	if f.To != "" {
+		<input type="hidden" name="to" value={ f.To }/>
+	}
+}
+
+templ filterForm(d HomeData) {
+	<form class="filters" method="get" action="/#sightings" role="search" aria-label="Filter sightings">
+		<input type="hidden" name="a" value={ d.Compare.A.Code }/>
+		<input type="hidden" name="b" value={ d.Compare.B.Code }/>
+		<label class="field">
+			<span>Animal</span>
+			<select name="animal">
+				<option value="">Any animal</option>
+				for _, o := range d.Animals {
+					<option value={ o.Value } selected?={ o.Value == d.Filter.Animal }>{ o.Label }</option>
+				}
+			</select>
+		</label>
+		<label class="field">
+			<span>Country</span>
+			<select name="country">
+				<option value="">Anywhere</option>
+				for _, o := range d.Countries {
+					<option value={ o.Value } selected?={ o.Value == d.Filter.Country }>{ o.Label }</option>
+				}
+			</select>
+		</label>
+		<label class="field">
+			<span>From</span>
+			<input type="date" name="from" value={ d.Filter.From }/>
+		</label>
+		<label class="field">
+			<span>Until</span>
+			<input type="date" name="to" value={ d.Filter.To }/>
+		</label>
+		<div class="filters__actions">
+			<button class="pill pill--forest" type="submit">Search</button>
+			if d.Filter.Active() {
+				<a class="filters__clear" href="/#sightings">Clear</a>
+			}
+		</div>
+	</form>
+}
+
+templ homeScripts() {
+	<script src="/assets/vendor/topojson-client.min.js" defer></script>
+	<script type="module" src="/assets/js/birds.js"></script>
+	<script type="module" src="/assets/js/globe.js"></script>
+	<script src="/assets/js/compare.js" defer></script>
 }

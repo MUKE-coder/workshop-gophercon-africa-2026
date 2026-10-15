@@ -1,32 +1,51 @@
 package components
 
-import (
-	"cmp"
-	"workshop/internal/domain/sighting"
-)
+import "workshop/internal/domain/sighting"
 
-templ Gallery(items []sighting.Media) {
-	if len(items) == 0 {
-		<p class="gallery__empty">No media recorded.</p>
+// Gallery shows a sighting's photos: the first large, the rest as
+// thumbnails. Each opens in the lightbox (see app.js).
+templ Gallery(items []sighting.Media, name, id string) {
+	{{ imgs := Images(items) }}
+	if len(imgs) == 0 {
+		<div class="gallery gallery--empty">
+			<p>Nobody photographed this one. The record is all we have.</p>
+		</div>
 	} else {
-		<ul class="gallery">
-			for _, m := range items {
-				<!-- Items -->
-				<li class="gallery__item">
-					if m.Type == "StillImage" {
-						<img src={ m.URL } alt={ altText(m) } loading="lazy"/>
-					} else {
-						<a href={ templ.URL(m.URL) } rel="noopener">{ altText(m) }</a>
-					}
-					if m.Creator != "" {
-						<figcaption class="gallery__credit">{ m.Creator }</figcaption>
+		<ul class="gallery" data-lightbox>
+			for i, m := range imgs {
+				<li class={ "gallery__item", templ.KV("gallery__item--lead", i == 0) }>
+					<a
+						href={ templ.SafeURL(Sized(m.URL, "large")) }
+						class="gallery__open"
+						data-credit={ creditLine(m) }
+						aria-label={ "Open photo " + itoa(i+1) + " of " + name }
+					>
+						if i == 0 {
+							<img src={ Sized(m.URL, "large") } alt={ AltText(m, name) } decoding="async" style={ TransitionName(id) } data-living/>
+						} else {
+							<img src={ Sized(m.URL, "medium") } alt={ AltText(m, name) } loading="lazy" decoding="async"/>
+						}
+					</a>
+					if i == 0 && m.Creator != "" {
+						<p class="gallery__credit">Photo by { m.Creator }</p>
 					}
 				</li>
 			}
 		</ul>
+		for _, m := range items {
+			if m.Type != "StillImage" && m.URL != "" {
+				<a href={ templ.SafeURL(m.URL) } rel="noopener">{ AltText(m, "Sighting media") }</a>
+			}
+		}
 	}
 }
 
-func altText(m sighting.Media) string {
-	return cmp.Or(m.Title, m.Description, "Sighting media")
+func creditLine(m sighting.Media) string {
+	if m.Creator == "" {
+		return ""
+	}
+	if m.License != "" {
+		return "Photo by " + m.Creator + " (" + licenceName(m.License) + ")"
+	}
+	return "Photo by " + m.Creator
 }

@@ -1,65 +1,47 @@
 package components
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
-	"strings"
-
 	"workshop/internal/domain/sighting"
-	"workshop/internal/domain/species"
 )
 
+// SightingCard is one card in the sightings grid. The whole card links to
+// the sighting's own page, and its photo flies there when clicked.
 templ SightingCard(s sighting.Sighting) {
+	{{ name := DisplayName(s.Species) }}
 	<article class="card">
-		<!-- Header -->
-		<header class="card__header">
-			<h2>{ displayName(s.Species) }</h2>
-			if s.Species.ScientificName != "" {
-				<p class="card__scientific">{ s.Species.ScientificName }</p>
-			}
-		</header>
-		<!-- Meta -->
-		<dl class="card__meta">
-			<dt>Seen</dt>
-			<dd>{ s.HappenedAt.Format("2 January 2006") }</dd>
-			<dt>Where</dt>
-			<dd>{ place(s.Location) }</dd>
-			if s.IndividualCount != nil {
-				<dt>Count</dt>
-				<dd>{ individuals(*s.IndividualCount) }</dd>
-			}
-			if s.RecordedBy != "" {
-				<dt>Recorded by</dt>
-				<dd>{ s.RecordedBy }</dd>
-			}
-		</dl>
-		<!-- Gallery -->
-		<div class="card__gallery">
-			@Gallery(s.Media)
-		</div>
+		<a class="card__link" href={ templ.SafeURL("/sightings/" + s.ID.String()) }>
+			<figure class="card__photo">
+				if img, ok := LeadImage(s); ok {
+					<img src={ Sized(img.URL, "medium") } alt={ AltText(img, name) } loading="lazy" decoding="async" style={ TransitionName(s.ID.String()) }/>
+					if n := len(Images(s.Media)); n > 1 {
+						<span class="card__count">{ n } photos</span>
+					}
+				} else {
+					<span class="card__placeholder" aria-hidden="true">{ string([]rune(name)[0]) }</span>
+				}
+			</figure>
+			<div class="card__body">
+				<div class="card__title">
+					<h3>{ name }</h3>
+					if HasWeather(s.Weather) {
+						<span class="card__weather" title={ s.Weather.Condition.Description }>
+							{ WeatherIcon(s.Weather.Condition.Code) } { tempShort(s) }
+						</span>
+					}
+				</div>
+				<p class="card__meta">{ ShortPlace(s.Location) }</p>
+				<p class="card__meta card__meta--soft">
+					<time datetime={ s.HappenedAt.Format("2006-01-02") }>{ s.HappenedAt.Format("2 January 2006") }</time>
+					if s.RecordedBy != "" {
+						<span class="card__by">by { s.RecordedBy }</span>
+					}
+				</p>
+			</div>
+		</a>
 	</article>
 }
 
-// displayName prefers the name a reader would recognise, falling back
-// through the taxonomy as GBIF records thin out.
-func displayName(sp species.Species) string {
-	return cmp.Or(sp.VernacularName, sp.CanonicalName, sp.ScientificName, "Unknown species")
-}
-
-// place joins whichever parts of the location GBIF supplied.
-func place(l sighting.Location) string {
-	parts := slices.DeleteFunc(
-		[]string{l.Locality, l.StateProvince, l.Country},
-		func(s string) bool { return s == "" },
-	)
-	return cmp.Or(strings.Join(parts, ", "), "Location unknown")
-}
-
-// individuals renders how many animals were seen in a single sighting.
-func individuals(n int) string {
-	if n == 1 {
-		return "1 individual"
-	}
-	return fmt.Sprintf("%d individuals", n)
+func tempShort(s sighting.Sighting) string {
+	return fmt.Sprintf("%.0f°", s.Weather.Temperature.Actual)
 }

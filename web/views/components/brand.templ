@@ -1,0 +1,63 @@
+package components
+
+import (
+	"strconv"
+	"strings"
+)
+
+// Logo is the Tazama mark: a simple eye. "Tazama" is Swahili for "look".
+templ Logo(size int) {
+	<svg class="logo" width={ strconv.Itoa(size) } height={ strconv.Itoa(size) } viewBox="0 0 32 32" aria-hidden="true">
+		<path d="M2 16C6.5 8.5 11 6 16 6s9.5 2.5 14 10c-4.5 7.5-9 10-14 10S6.5 23.5 2 16Z" fill="currentColor"></path>
+		<circle cx="16" cy="16" r="6" fill="var(--paper)"></circle>
+		<circle cx="16" cy="16" r="3.4" fill="currentColor"></circle>
+		<circle cx="17.6" cy="14.4" r="1.2" fill="var(--paper)"></circle>
+	</svg>
+}
+
+// Leaf is a small leaf icon for badges.
+templ Leaf() {
+	<svg class="leaf" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M13.5 2.5C7 2.5 3 5.5 3 10c0 1.2.4 2.3 1 3.2C5.2 9.6 7.7 7.4 10.5 6c-2.4 1.8-4.4 4.3-5.4 7.4.8.4 1.7.6 2.6.6 4.4 0 5.8-4.6 5.8-11.5Z" fill="currentColor"></path></svg>
+}
+
+// Arrow is the round arrow badge that sits inside pill buttons.
+templ Arrow() {
+	<span class="pill__arrow" aria-hidden="true">
+		<svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+	</span>
+}
+
+// Lines splits a headline into lines, so the intro can raise them one by one.
+templ Lines(lines ...string) {
+	for _, l := range lines {
+		<span class="line"><span class="line__inner">{ l }</span></span>
+	}
+}
+
+// TransitionName gives a sighting's photo the same name on every page, so
+// the browser can fly it from a tile to the sighting's own page.
+func TransitionName(id string) templ.SafeCSS {
+	return templ.SafeCSS("view-transition-name: s-" + id)
+}
+
+func itoa(n int) string { return strconv.Itoa(n) }
+
+func licenceName(url string) string {
+	switch {
+	case strings.Contains(url, "by-nc-sa"):
+		return "CC BY-NC-SA"
+	case strings.Contains(url, "by-nc-nd"):
+		return "CC BY-NC-ND"
+	case strings.Contains(url, "by-nc"):
+		return "CC BY-NC"
+	case strings.Contains(url, "by-sa"):
+		return "CC BY-SA"
+	case strings.Contains(url, "by-nd"):
+		return "CC BY-ND"
+	case strings.Contains(url, "/by/"):
+		return "CC BY"
+	case strings.Contains(url, "zero"), strings.Contains(url, "publicdomain"):
+		return "CC0"
+	}
+	return "licensed"
+}

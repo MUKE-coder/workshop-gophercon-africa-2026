@@ -1,0 +1,201 @@
+package pages
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+	"workshop/internal/domain/sighting"
+	"workshop/internal/domain/species"
+	"workshop/web/views/components"
+	"workshop/web/views/layout"
+)
+
+templ Sighting(d SightingData) {
+	{{ s := d.Sighting }}
+	{{ name := components.DisplayName(s.Species) }}
+	@layout.Base(layout.BaseProps{
+		Title:       name + " in " + components.ShortPlace(s.Location),
+		Description: name + " seen on " + s.HappenedAt.Format("2 January 2006") + " in " + components.Place(s.Location) + ".",
+		Head:        leafletHead(),
+		Scripts:     leafletScripts(),
+	}) {
+		<article class={ "sighting", "sighting--" + components.Accent(name) }>
+			<nav class="crumbs" aria-label="Breadcrumb">
+				<a href="/#sightings">Sightings</a>
+				<span aria-hidden="true">/</span>
+				<span>{ name }</span>
+			</nav>
+			<header class="sighting__head">
+				<h1>{ name }</h1>
+				if s.Species.ScientificName != "" {
+					<p class="sighting__sci">{ s.Species.ScientificName }</p>
+				}
+				if t := taxonomy(s.Species); t != "" {
+					<p class="sighting__taxonomy">{ t }</p>
+				}
+			</header>
+			<div class="sighting__layout">
+				<div class="sighting__media">
+					@components.Gallery(s.Media, name, s.ID.String())
+					@watch(s.Species.CanonicalName, name)
+				</div>
+				<aside class="sighting__facts">
+					<section class="panel">
+						<h2>The sighting</h2>
+						<dl class="facts">
+							<dt>Seen</dt>
+							<dd><time datetime={ s.HappenedAt.Format("2006-01-02") }>{ s.HappenedAt.Format("Monday 2 January 2006") }</time></dd>
+							<dt>Where</dt>
+							<dd>{ components.Place(s.Location) }</dd>
+							if s.IndividualCount != nil {
+								<dt>How many</dt>
+								<dd>{ components.Individuals(*s.IndividualCount) }</dd>
+							}
+							if s.RecordedBy != "" {
+								<dt>Recorded by</dt>
+								<dd>{ s.RecordedBy }</dd>
+							}
+							if s.Location.ElevationInMetres != nil {
+								<dt>Elevation</dt>
+								<dd>{ fmt.Sprintf("%.0f m", *s.Location.ElevationInMetres) }</dd>
+							}
+							<dt>Position</dt>
+							<dd>{ coords(s.Location) }</dd>
+						</dl>
+					</section>
+					if components.HasWeather(s.Weather) {
+						@weatherPanel(s)
+					}
+					<section class="panel panel--map">
+						<h2>On the map</h2>
+						<div
+							class="minimap"
+							data-minimap
+							data-lat={ fmt.Sprint(s.Location.Latitude) }
+							data-lng={ fmt.Sprint(s.Location.Longitude) }
+							data-hue={ components.Accent(name) }
+							role="img"
+							aria-label={ "Map showing " + components.Place(s.Location) }
+						></div>
+					</section>
+					if s.Remarks != "" {
+						<section class="panel">
+							<h2>Notes from the field</h2>
+							<p class="remarks">{ s.Remarks }</p>
+						</section>
+					}
+					if s.ReferenceURL != "" {
+						<a class="pill pill--dark" href={ templ.SafeURL(s.ReferenceURL) } rel="noopener">View the original record</a>
+					}
+				</aside>
+			</div>
+		</article>
+		if len(d.Nearby) > 0 {
+			<section class="section" aria-labelledby="nearby-title">
+				<div class="section__head">
+					<h2 id="nearby-title">Also seen in { s.Location.Country }</h2>
+				</div>
+				<ul class="grid grid--row">
+					for _, n := range d.Nearby {
+						<li>
+							@components.SightingCard(n)
+						</li>
+					}
+				</ul>
+			</section>
+		}
+	}
+}
+
+templ weatherPanel(s sighting.Sighting) {
+	{{ w := s.Weather }}
+	<section class="panel panel--weather">
+		<h2>The weather that hour</h2>
+		<div class="weather">
+			<p class="weather__now">
+				<span class="weather__icon" aria-hidden="true">{ components.WeatherIcon(w.Condition.Code) }</span>
+				<span class="weather__temp">{ fmt.Sprintf("%.0f°", w.Temperature.Actual) }</span>
+				<span class="weather__desc">
+					{ w.Condition.Description }
+					<small>Felt like { fmt.Sprintf("%.0f°C", w.Temperature.Apparent) }</small>
+				</span>
+			</p>
+			<dl class="weather__grid">
+				<div>
+					<dt>Wind</dt>
+					<dd>
+						<span class="wind-arrow" style={ templ.SafeCSS("transform: rotate(" + strconv.Itoa(w.Wind.Direction+180) + "deg)") } aria-hidden="true">↑</span>
+						{ fmt.Sprintf("%.0f km/h %s", w.Wind.Speed, components.Compass(w.Wind.Direction)) }
+					</dd>
+				</div>
+				<div>
+					<dt>Gusts</dt>
+					<dd>{ fmt.Sprintf("%.0f km/h", w.Wind.Gusts) }</dd>
+				</div>
+				<div>
+					<dt>Humidity</dt>
+					<dd>{ strconv.Itoa(w.Humidity) }%</dd>
+				</div>
+				<div>
+					<dt>Cloud</dt>
+					<dd>{ strconv.Itoa(w.CloudCover) }%</dd>
+				</div>
+				<div>
+					<dt>Rain</dt>
+					<dd>{ fmt.Sprintf("%.1f mm", w.Precipitation.Rain) }</dd>
+				</div>
+				if w.Precipitation.Snowfall > 0 {
+					<div>
+						<dt>Snow</dt>
+						<dd>{ fmt.Sprintf("%.1f cm", w.Precipitation.Snowfall) }</dd>
+					</div>
+				}
+			</dl>
+		</div>
+	</section>
+}
+
+templ watch(scientific, name string) {
+	<section class="watch" data-watch data-scientific={ scientific } data-name={ name } aria-labelledby="watch-title">
+		<div class="watch__head">
+			<h2 id="watch-title">Watch it <em class="script">move</em></h2>
+			<p>Videos of { name } from Wikimedia Commons, shared freely by filmmakers around the world.</p>
+		</div>
+		<div class="watch__player" data-watch-player>
+			<p class="watch__status" data-watch-status>Looking for videos of { name }…</p>
+		</div>
+		<ul class="watch__more" data-watch-list></ul>
+	</section>
+}
+
+templ leafletHead() {
+	<link rel="stylesheet" href="/assets/vendor/leaflet/leaflet.css"/>
+}
+
+templ leafletScripts() {
+	<script src="/assets/vendor/leaflet/leaflet.js" defer></script>
+	<script src="/assets/js/map.js" defer></script>
+	<script src="/assets/js/watch.js" defer></script>
+}
+
+func taxonomy(sp species.Species) string {
+	var parts []string
+	for _, p := range []string{sp.Class, sp.Order, sp.Family} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return strings.Join(parts, " / ")
+}
+
+func coords(l sighting.Location) string {
+	ns, ew := "N", "E"
+	lat, lng := l.Latitude, l.Longitude
+	if lat < 0 {
+		ns, lat = "S", -lat
+	}
+	if lng < 0 {
+		ew, lng = "W", -lng
+	}
+	return fmt.Sprintf("%.3f° %s, %.3f° %s", lat, ns, lng, ew)
+}

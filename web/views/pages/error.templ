@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"net/http"
 	"strconv"
 	"workshop/web/views/layout"
 )
@@ -9,7 +10,22 @@ templ Error(message string, code int) {
 	@layout.Base(layout.BaseProps{
 		Title: "Error " + strconv.Itoa(code),
 	}) {
-		<h1>{ strconv.Itoa(code) }</h1>
-		<p>{ message }</p>
+		<section class="lost" aria-labelledby="lost-title">
+			<p class="lost__code" aria-hidden="true">{ strconv.Itoa(code) }</p>
+			<div class="lost__tracks" aria-hidden="true">
+				for range 7 {
+					<span class="paw"></span>
+				}
+			</div>
+			<h1 id="lost-title">
+				if code == http.StatusNotFound {
+					This animal wandered off.
+				} else {
+					Something went wrong on our side.
+				}
+			</h1>
+			<p class="lost__message">{ message }</p>
+			<a class="pill pill--dark" href="/">Back to the sightings</a>
+		</section>
 	}
 }

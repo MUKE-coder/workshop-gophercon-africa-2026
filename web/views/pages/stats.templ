@@ -1,0 +1,84 @@
+package pages
+
+import (
+	"strconv"
+	"workshop/internal/domain/sighting"
+	"workshop/web/views/components"
+	"workshop/web/views/layout"
+)
+
+templ Stats(d StatsData) {
+	@layout.Base(layout.BaseProps{
+		Title:       "Numbers",
+		Description: "What has been seen, where, and when.",
+		Active:      "stats",
+	}) {
+		<section class="section stats-intro" aria-labelledby="stats-title">
+			<h1 id="stats-title">By the numbers</h1>
+			<p class="stats-lede">
+				{ strconv.Itoa(d.Summary.Sightings) } sightings of { strconv.Itoa(d.Summary.Species) } species, in
+				{ strconv.Itoa(d.Summary.Countries) } countries, by { strconv.Itoa(d.Summary.Recorders) } recorders,
+				with { strconv.Itoa(d.Summary.Media) } photos. The oldest record is from
+				{ d.Summary.Earliest.Format("January 2006") }; the newest is from { d.Summary.Latest.Format("2 January 2006") }.
+			</p>
+		</section>
+		<div class="stats-grid">
+			@bars("Most seen animals", "The species with the most sightings.", d.Species, "marigold")
+			@bars("Busiest countries", "Where the most sightings were recorded.", d.Countries, "leaf")
+			@bars("The weather they were seen in", "Sky conditions in the hour of each sighting.", d.Conditions, "lagoon wide")
+			@timeline(d.Decades)
+		</div>
+		if len(d.Recent) > 0 {
+			<section class="section" aria-labelledby="recent-title">
+				<div class="section__head">
+					<h2 id="recent-title">Newest sightings</h2>
+				</div>
+				<ul class="grid grid--row">
+					for _, s := range d.Recent {
+						<li>
+							@components.SightingCard(s)
+						</li>
+					}
+				</ul>
+			</section>
+		}
+	}
+}
+
+templ bars(title, note string, rows []sighting.Tally, hue string) {
+	{{ top := MaxCount(rows) }}
+	<section class={ "chart", "chart--" + hue }>
+		<h2>{ title }</h2>
+		<p class="chart__note">{ note }</p>
+		<ol class="bars">
+			for _, r := range rows {
+				<li class="bar">
+					<span class="bar__label">{ r.Name }</span>
+					<span class="bar__track">
+						<span class="bar__fill" style={ templ.SafeCSS("--w:" + components.Percent(r.Count, top)) }></span>
+					</span>
+					<span class="bar__value">{ strconv.Itoa(r.Count) }</span>
+				</li>
+			}
+		</ol>
+	</section>
+}
+
+templ timeline(rows []sighting.Tally) {
+	{{ top := MaxCount(rows) }}
+	<section class="chart chart--hibiscus chart--wide">
+		<h2>Sightings by decade</h2>
+		<p class="chart__note">Most records are recent: phones and apps made recording a sighting easy.</p>
+		<ol class="columns">
+			for _, r := range rows {
+				<li class="column">
+					<span class="column__value">{ strconv.Itoa(r.Count) }</span>
+					<span class="column__track">
+						<span class="column__fill" style={ templ.SafeCSS("--h:" + components.Percent(r.Count, top)) }></span>
+					</span>
+					<span class="column__label">{ r.Name }</span>
+				</li>
+			}
+		</ol>
+	</section>
+}
